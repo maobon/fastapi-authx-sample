@@ -223,3 +223,5 @@ __marimo__/
 /.idea/.gitignore
 /.idea/dataSources.xml
 /.idea/vcs.xml
+/.idea/misc.xml
+/.idea/sqldialects.xml

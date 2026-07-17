@@ -6,11 +6,13 @@ import psycopg
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 
 from authx import AuthX, AuthXConfig
+
+from constant import DEFAULT_DATABASE_URL
 from utils.crypto_utils import CryptoUtils, verify_password
 from utils.database_utils import DatabaseUtils
 from model import LoginRequest, PasswordUpdateRequest, RegisterRequest, TokenResponse, UserResponse
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql:///myapp")
+DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
 PASSWORD_HASH_ITERATIONS = 260_000
 database = DatabaseUtils(DATABASE_URL)
 crypto = CryptoUtils(PASSWORD_HASH_ITERATIONS)
@@ -145,7 +147,7 @@ def read_root():
         "message": "Welcome to AuthX PostgreSQL Database Example",
         "database": {
             "url_env": "DATABASE_URL",
-            "default": "postgresql:///myapp",
+            "default": DEFAULT_DATABASE_URL,
             "table": "user_info",
         },
         "endpoints": {

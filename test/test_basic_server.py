@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import database
+import basic_server
 from model import LoginRequest, RegisterRequest
 
 
@@ -15,19 +15,19 @@ def unique_username(prefix: str) -> str:
 @pytest.fixture
 def username():
     value = unique_username("BasicTest")
-    database.delete_user(value)
+    basic_server.delete_user(value)
     yield value
-    database.delete_user(value)
+    basic_server.delete_user(value)
 
 
 @pytest.fixture
 def client():
-    with TestClient(database.app) as test_client:
+    with TestClient(basic_server.app) as test_client:
         yield test_client
 
 
 def test_init_database_and_lifespan_create_table(client):
-    database.init_database()
+    basic_server.init_database()
     response = client.get("/")
 
     assert response.status_code == 200
@@ -35,33 +35,33 @@ def test_init_database_and_lifespan_create_table(client):
 
 
 def test_create_get_update_delete_user_helpers(username):
-    created_user = database.create_user(username, "Passw0rd!")
+    created_user = basic_server.create_user(username, "Passw0rd!")
 
     assert created_user["username"] == username
     assert "password_hash" not in created_user
 
-    public_user = database.get_user_by_username(username)
-    private_user = database.get_user_by_username(username, include_password_hash=True)
+    public_user = basic_server.get_user_by_username(username)
+    private_user = basic_server.get_user_by_username(username, include_password_hash=True)
 
     assert public_user["username"] == username
     assert "password_hash" not in public_user
     assert private_user["password_hash"].startswith("pbkdf2_sha256$")
 
-    updated_user = database.update_user_password(username, "Newpass1!")
-    updated_private_user = database.get_user_by_username(username, include_password_hash=True)
+    updated_user = basic_server.update_user_password(username, "Newpass1!")
+    updated_private_user = basic_server.get_user_by_username(username, include_password_hash=True)
 
     assert updated_user["username"] == username
-    assert database.verify_password("Newpass1!", updated_private_user["password_hash"])
-    assert database.delete_user(username) is True
-    assert database.delete_user(username) is False
-    assert database.get_user_by_username(username) is None
+    assert basic_server.verify_password("Newpass1!", updated_private_user["password_hash"])
+    assert basic_server.delete_user(username) is True
+    assert basic_server.delete_user(username) is False
+    assert basic_server.get_user_by_username(username) is None
 
 
 def test_create_user_duplicate_raises_conflict(username):
-    database.create_user(username, "Passw0rd!")
+    basic_server.create_user(username, "Passw0rd!")
 
     with pytest.raises(HTTPException) as exc_info:
-        database.create_user(username, "Passw0rd!")
+        basic_server.create_user(username, "Passw0rd!")
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "Username already exists"
@@ -97,8 +97,8 @@ def test_register_login_read_root_routes(client, username):
 
 
 def test_login_function_returns_token_response(username):
-    database.register(RegisterRequest(username=username, password="Passw0rd!"))
-    token_response = database.login(LoginRequest(username=username, password="Passw0rd!"))
+    basic_server.register(RegisterRequest(username=username, password="Passw0rd!"))
+    token_response = basic_server.login(LoginRequest(username=username, password="Passw0rd!"))
 
     assert token_response.token_type == "bearer"
     assert token_response.access_token
@@ -106,12 +106,12 @@ def test_login_function_returns_token_response(username):
 
 def test_login_function_rejects_invalid_credentials(username):
     with pytest.raises(HTTPException) as missing_user_exc:
-        database.login(LoginRequest(username=username, password="Passw0rd!"))
+        basic_server.login(LoginRequest(username=username, password="Passw0rd!"))
 
-    database.register(RegisterRequest(username=username, password="Passw0rd!"))
+    basic_server.register(RegisterRequest(username=username, password="Passw0rd!"))
 
     with pytest.raises(HTTPException) as bad_password_exc:
-        database.login(LoginRequest(username=username, password="wrongPass1!"))
+        basic_server.login(LoginRequest(username=username, password="wrongPass1!"))
 
     assert missing_user_exc.value.status_code == 401
     assert bad_password_exc.value.status_code == 401

@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import database_advance
+import advanced_server
 from model import LoginRequest, RefreshRequest, RegisterRequest
 
 
@@ -15,29 +15,29 @@ def unique_username(prefix: str) -> str:
 @pytest.fixture
 def username():
     value = unique_username("AdvanceTest")
-    database_advance.delete_user(value)
+    advanced_server.delete_user(value)
     yield value
-    database_advance.delete_user(value)
+    advanced_server.delete_user(value)
 
 
 @pytest.fixture
 def client():
-    with TestClient(database_advance.app) as test_client:
+    with TestClient(advanced_server.app) as test_client:
         yield test_client
 
 
 def register_user(username: str) -> dict:
-    return database_advance.create_user(username, "Passw0rd!")
+    return advanced_server.create_user(username, "Passw0rd!")
 
 
 def issue_tokens_for(username: str) -> tuple[str, str]:
-    user = database_advance.get_user_by_username(username, include_password_hash=True)
-    token_pair = database_advance.issue_token_pair(user)
+    user = advanced_server.get_user_by_username(username, include_password_hash=True)
+    token_pair = advanced_server.issue_token_pair(user)
     return token_pair.access_token, token_pair.refresh_token
 
 
 def test_init_database_and_lifespan_create_tables(client):
-    database_advance.init_database()
+    advanced_server.init_database()
     response = client.get("/")
 
     assert response.status_code == 200
@@ -45,33 +45,33 @@ def test_init_database_and_lifespan_create_tables(client):
 
 
 def test_create_get_update_delete_user_helpers(username):
-    created_user = database_advance.create_user(username, "Passw0rd!")
+    created_user = advanced_server.create_user(username, "Passw0rd!")
 
     assert created_user["username"] == username
     assert "password_hash" not in created_user
 
-    public_user = database_advance.get_user_by_username(username)
-    private_user = database_advance.get_user_by_username(username, include_password_hash=True)
+    public_user = advanced_server.get_user_by_username(username)
+    private_user = advanced_server.get_user_by_username(username, include_password_hash=True)
 
     assert public_user["username"] == username
     assert "password_hash" not in public_user
     assert private_user["password_hash"].startswith("pbkdf2_sha256$")
 
-    updated_user = database_advance.update_user_password(username, "Newpass1!")
-    updated_private_user = database_advance.get_user_by_username(username, include_password_hash=True)
+    updated_user = advanced_server.update_user_password(username, "Newpass1!")
+    updated_private_user = advanced_server.get_user_by_username(username, include_password_hash=True)
 
     assert updated_user["username"] == username
-    assert database_advance.verify_password("Newpass1!", updated_private_user["password_hash"])
-    assert database_advance.delete_user(username) is True
-    assert database_advance.delete_user(username) is False
-    assert database_advance.get_user_by_username(username) is None
+    assert advanced_server.verify_password("Newpass1!", updated_private_user["password_hash"])
+    assert advanced_server.delete_user(username) is True
+    assert advanced_server.delete_user(username) is False
+    assert advanced_server.get_user_by_username(username) is None
 
 
 def test_create_user_duplicate_raises_conflict(username):
-    database_advance.create_user(username, "Passw0rd!")
+    advanced_server.create_user(username, "Passw0rd!")
 
     with pytest.raises(HTTPException) as exc_info:
-        database_advance.create_user(username, "Passw0rd!")
+        advanced_server.create_user(username, "Passw0rd!")
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "Username already exists"
@@ -79,20 +79,20 @@ def test_create_user_duplicate_raises_conflict(username):
 
 def test_session_helpers_and_decode_refresh_token(username):
     user = register_user(username)
-    refresh_token = database_advance.auth.create_refresh_token(uid=username)
-    refresh_payload = database_advance.decode_refresh_token(refresh_token)
-    session = database_advance.create_session(user["id"], refresh_token)
-    active_session = database_advance.get_active_session(refresh_token)
-    sessions = database_advance.list_user_sessions(username)
+    refresh_token = advanced_server.auth.create_refresh_token(uid=username)
+    refresh_payload = advanced_server.decode_refresh_token(refresh_token)
+    session = advanced_server.create_session(user["id"], refresh_token)
+    active_session = advanced_server.get_active_session(refresh_token)
+    sessions = advanced_server.list_user_sessions(username)
 
     assert refresh_payload.sub == username
     assert refresh_payload.type == "refresh"
     assert session["refresh_jti"] == refresh_payload.jti
     assert active_session["username"] == username
     assert any(item["refresh_jti"] == refresh_payload.jti for item in sessions)
-    assert database_advance.revoke_session(refresh_token) is True
-    assert database_advance.revoke_session(refresh_token) is False
-    assert database_advance.get_active_session(refresh_token) is None
+    assert advanced_server.revoke_session(refresh_token) is True
+    assert advanced_server.revoke_session(refresh_token) is False
+    assert advanced_server.get_active_session(refresh_token) is None
 
 
 def test_decode_refresh_token_rejects_access_token(username):
@@ -100,20 +100,20 @@ def test_decode_refresh_token_rejects_access_token(username):
     access_token, _ = issue_tokens_for(username)
 
     with pytest.raises(ValueError):
-        database_advance.decode_refresh_token(access_token)
+        advanced_server.decode_refresh_token(access_token)
 
 
 def test_issue_token_pair_and_revoke_all_sessions(username):
     register_user(username)
     access_token, refresh_token = issue_tokens_for(username)
-    active_session = database_advance.get_active_session(refresh_token)
-    revoked_count = database_advance.revoke_all_user_sessions(username)
+    active_session = advanced_server.get_active_session(refresh_token)
+    revoked_count = advanced_server.revoke_all_user_sessions(username)
 
     assert access_token
     assert refresh_token
     assert active_session["username"] == username
     assert revoked_count >= 1
-    assert database_advance.get_active_session(refresh_token) is None
+    assert advanced_server.get_active_session(refresh_token) is None
 
 
 def test_register_login_read_root_routes(client, username):
@@ -148,8 +148,8 @@ def test_register_login_read_root_routes(client, username):
 
 
 def test_login_function_returns_token_pair(username):
-    database_advance.register(RegisterRequest(username=username, password="Passw0rd!"))
-    token_pair = database_advance.login(LoginRequest(username=username, password="Passw0rd!"))
+    advanced_server.register(RegisterRequest(username=username, password="Passw0rd!"))
+    token_pair = advanced_server.login(LoginRequest(username=username, password="Passw0rd!"))
 
     assert token_pair.token_type == "bearer"
     assert token_pair.access_token
@@ -158,12 +158,12 @@ def test_login_function_returns_token_pair(username):
 
 def test_login_function_rejects_invalid_credentials(username):
     with pytest.raises(HTTPException) as missing_user_exc:
-        database_advance.login(LoginRequest(username=username, password="Passw0rd!"))
+        advanced_server.login(LoginRequest(username=username, password="Passw0rd!"))
 
-    database_advance.register(RegisterRequest(username=username, password="Passw0rd!"))
+    advanced_server.register(RegisterRequest(username=username, password="Passw0rd!"))
 
     with pytest.raises(HTTPException) as bad_password_exc:
-        database_advance.login(LoginRequest(username=username, password="wrongPass1!"))
+        advanced_server.login(LoginRequest(username=username, password="wrongPass1!"))
 
     assert missing_user_exc.value.status_code == 401
     assert bad_password_exc.value.status_code == 401
@@ -220,13 +220,13 @@ def test_refresh_rotate_logout_and_logout_all_routes(client, username):
 
 def test_refresh_and_logout_functions_reject_invalid_tokens():
     with pytest.raises(HTTPException) as refresh_exc:
-        database_advance.refresh_token(RefreshRequest(refresh_token="not-a-jwt"))
+        advanced_server.refresh_token(RefreshRequest(refresh_token="not-a-jwt"))
 
     with pytest.raises(HTTPException) as rotate_exc:
-        database_advance.rotate_refresh_token(RefreshRequest(refresh_token="not-a-jwt"))
+        advanced_server.rotate_refresh_token(RefreshRequest(refresh_token="not-a-jwt"))
 
     with pytest.raises(HTTPException) as logout_exc:
-        database_advance.logout(RefreshRequest(refresh_token="not-a-jwt"))
+        advanced_server.logout(RefreshRequest(refresh_token="not-a-jwt"))
 
     assert refresh_exc.value.status_code == 401
     assert rotate_exc.value.status_code == 401

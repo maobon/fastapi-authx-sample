@@ -220,3 +220,6 @@ __marimo__/
 /.idea/fastapi-authx-sample.iml
 /.idea/modules.xml
 /.idea/workspace.xml
+/.idea/.gitignore
+/.idea/dataSources.xml
+/.idea/vcs.xml

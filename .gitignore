@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+/.idea/fastapi-authx-sample@1.iml
+/.idea/fastapi-authx-sample.iml
+/.idea/modules.xml
+/.idea/workspace.xml

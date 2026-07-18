@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import psycopg
-from fastapi import APIRouter, FastAPI, HTTPException, Request, status
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, status
+from psycopg.rows import dict_row
 
 from authx import AuthX, AuthXConfig
 
+from business.database_sql import SELECT_NEWS, SELECT_NEWS_PAGED
 from constant import DEFAULT_DATABASE_URL
 from utils.crypto_utils import CryptoUtils, verify_password
 from utils.database_utils import DatabaseUtils
@@ -14,6 +16,8 @@ from model import LoginRequest, PasswordUpdateRequest, RegisterRequest, TokenRes
 
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
 PASSWORD_HASH_ITERATIONS = 260_000
+DEFAULT_NEWS_PAGE_SIZE = 20
+MAX_NEWS_PAGE_SIZE = 100
 database = DatabaseUtils(DATABASE_URL)
 crypto = CryptoUtils(PASSWORD_HASH_ITERATIONS)
 
@@ -31,7 +35,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="FastAPI+PostgreSQL AuthX Sample", lifespan=lifespan)
-protected_router = APIRouter(prefix="/router", tags=["router-protected"])
+protected_router = APIRouter(prefix="/api", tags=["router-protected"])
 
 auth_config = AuthXConfig(
     JWT_ALGORITHM="HS256",
@@ -68,6 +72,20 @@ def update_user_password(username: str, password: str) -> Optional[dict]:
 def delete_user(username: str) -> bool:
     """删除当前用户记录；返回值表示数据库中是否实际删除了数据。"""
     return database.delete_user(username)
+
+
+def list_news(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PAGE_SIZE) -> list[dict]:
+    """读取 PostgreSQL 数据库中 `news` 表的新闻数据。"""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as connection:
+        with connection.cursor() as cursor:
+            if page is None:
+                cursor.execute(SELECT_NEWS)
+            else:
+                cursor.execute(
+                    SELECT_NEWS_PAGED,
+                    (page_size, (page - 1) * page_size),
+                )
+            return cursor.fetchall()
 
 
 async def verify_access_token(request: Request) -> str:
@@ -137,6 +155,25 @@ async def protected_router_route(request: Request):
     return {"message": "You have access to this router protected resource", "username": username}
 
 
+@protected_router.get("/news")
+async def protected_news(
+    request: Request,
+    page: Optional[int] = Query(default=None, ge=1),
+    page_size: int = Query(default=DEFAULT_NEWS_PAGE_SIZE, ge=1, le=MAX_NEWS_PAGE_SIZE),
+):
+    """受保护新闻接口：JWT 校验通过后返回 `news` 表中的新闻数据。"""
+    await verify_access_token(request)
+    try:
+        news = list_news(page=page, page_size=page_size)
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to query news",
+        ) from exc
+
+    return {"news": news}
+
+
 app.include_router(protected_router)
 
 
@@ -158,6 +195,7 @@ def read_root():
             "delete_me": "DELETE /me - Delete current user",
             "protected": "GET /protected - Access protected resource",
             "router_protected": "GET /router/protected - Same protection implemented with APIRouter",
+            "router_news": "GET /router/news - List news records after JWT verification",
         },
     }
 

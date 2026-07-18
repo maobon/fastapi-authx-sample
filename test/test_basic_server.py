@@ -3,6 +3,7 @@ from datetime import datetime
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from psycopg.rows import dict_row
 
 import basic_server
 from model import LoginRequest, RegisterRequest
@@ -10,6 +11,40 @@ from model import LoginRequest, RegisterRequest
 
 def unique_username(prefix: str) -> str:
     return f"{prefix}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+
+
+class FakeCursor:
+    def __init__(self, rows):
+        self.rows = rows
+        self.query = None
+        self.params = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, query, params=None):
+        self.query = query
+        self.params = params
+
+    def fetchall(self):
+        return self.rows
+
+
+class FakeConnection:
+    def __init__(self, cursor):
+        self.fake_cursor = cursor
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def cursor(self):
+        return self.fake_cursor
 
 
 @pytest.fixture
@@ -158,9 +193,54 @@ def test_protected_me_update_password_and_delete_routes(client, username):
     assert deleted_me_response.status_code == 404
 
 
+def test_router_news_requires_token_and_returns_news(client, monkeypatch):
+    rows = [
+        {
+            "id": 1,
+            "title": "JWT Protected News",
+            "url": "https://example.com/news/1",
+            "image": "https://example.com/image.jpg",
+            "summary": "A protected news summary",
+            "date": datetime(2026, 7, 18).date(),
+            "img": None,
+        }
+    ]
+    cursor = FakeCursor(rows)
+
+    def fake_connect(database_url, row_factory):
+        assert database_url == basic_server.DATABASE_URL
+        assert row_factory is dict_row
+        return FakeConnection(cursor)
+
+    monkeypatch.setattr(basic_server.psycopg, "connect", fake_connect)
+    token = basic_server.auth.create_access_token(uid="NewsUser")
+
+    missing_token_response = client.get("/router/news")
+    response = client.get("/router/news?page=2&page_size=10", headers={"Authorization": f"Bearer {token}"})
+
+    assert missing_token_response.status_code == 401
+    assert response.status_code == 200
+    assert response.json() == {
+        "news": [
+            {
+                "id": 1,
+                "title": "JWT Protected News",
+                "url": "https://example.com/news/1",
+                "image": "https://example.com/image.jpg",
+                "summary": "A protected news summary",
+                "date": "2026-07-18",
+                "img": None,
+            }
+        ],
+    }
+    assert "LIMIT %s OFFSET %s" in cursor.query
+    assert cursor.params == (10, 10)
+
+
 def test_protected_routes_reject_missing_token(client):
     assert client.get("/me").status_code == 401
     assert client.put("/me/password", json={"password": "Newpass1!"}).status_code == 401
     assert client.delete("/me").status_code == 401
     assert client.get("/protected").status_code == 401
     assert client.get("/router/protected").status_code == 401
+    assert client.get("/router/news").status_code == 401

@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi.testclient import TestClient
+from starlette.testclient import TestClient
 from psycopg.rows import dict_row
 
 import business.server as business_server

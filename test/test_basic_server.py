@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
+from starlette.testclient import TestClient
 from psycopg.rows import dict_row
 
 import basic_server

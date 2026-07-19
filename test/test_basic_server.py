@@ -36,6 +36,7 @@ class FakeCursor:
 class FakeConnection:
     def __init__(self, cursor):
         self.fake_cursor = cursor
+        self.closed = False
 
     def __enter__(self):
         return self
@@ -45,6 +46,15 @@ class FakeConnection:
 
     def cursor(self):
         return self.fake_cursor
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        self.closed = True
 
 
 @pytest.fixture

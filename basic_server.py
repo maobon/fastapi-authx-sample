@@ -11,7 +11,7 @@ from authx import AuthX, AuthXConfig
 from business.database_sql import SELECT_NEWS, SELECT_NEWS_PAGED
 from constant import DEFAULT_DATABASE_URL
 from utils.crypto_utils import CryptoUtils, verify_password
-from utils.database_utils import DatabaseUtils
+from utils.database_utils import DatabaseUtils, database_cursor
 from model import LoginRequest, PasswordUpdateRequest, RegisterRequest, TokenResponse, UserResponse
 
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
@@ -76,16 +76,15 @@ def delete_user(username: str) -> bool:
 
 def list_news(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PAGE_SIZE) -> list[dict]:
     """读取 PostgreSQL 数据库中 `news` 表的新闻数据。"""
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as connection:
-        with connection.cursor() as cursor:
-            if page is None:
-                cursor.execute(SELECT_NEWS)
-            else:
-                cursor.execute(
-                    SELECT_NEWS_PAGED,
-                    (page_size, (page - 1) * page_size),
-                )
-            return cursor.fetchall()
+    with database_cursor(DATABASE_URL, row_factory=dict_row) as cursor:
+        if page is None:
+            cursor.execute(SELECT_NEWS)
+        else:
+            cursor.execute(
+                SELECT_NEWS_PAGED,
+                (page_size, (page - 1) * page_size),
+            )
+        return cursor.fetchall()
 
 
 async def verify_access_token(request: Request) -> str:

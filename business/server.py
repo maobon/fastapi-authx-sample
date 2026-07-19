@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from constant import DEFAULT_DATABASE_URL
 from business.database_sql import SELECT_NEWS, SELECT_NEWS_PAGED
+from utils.database_utils import database_cursor
 
 
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
@@ -33,16 +34,15 @@ app.add_middleware(
 
 def list_news(page: Optional[int] = None, page_size: int = DEFAULT_PAGE_SIZE) -> list[dict]:
     """读取 PostgreSQL `myapp` 数据库中的 `news` 表数据。"""
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as connection:
-        with connection.cursor() as cursor:
-            if page is None:
-                cursor.execute(SELECT_NEWS)
-            else:
-                cursor.execute(
-                    SELECT_NEWS_PAGED,
-                    (page_size, (page - 1) * page_size),
-                )
-            return cursor.fetchall()
+    with database_cursor(DATABASE_URL, row_factory=dict_row) as cursor:
+        if page is None:
+            cursor.execute(SELECT_NEWS)
+        else:
+            cursor.execute(
+                SELECT_NEWS_PAGED,
+                (page_size, (page - 1) * page_size),
+            )
+        return cursor.fetchall()
 
 
 @app.get("/news")

@@ -21,12 +21,17 @@ from utils.database_sql import (
 )
 
 
-_DROP_PATTERN = re.compile(r"\bDROP\s+(DATABASE|TABLE)\b", re.IGNORECASE)
+_BLOCK_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", re.DOTALL)
+_LINE_COMMENT_PATTERN = re.compile(r"--[^\r\n]*(?:\r?\n|$)")
+_DROP_PATTERN = re.compile(r"\bDROP\s+(DATABASE|SCHEMA|TABLE|OWNED)\b", re.IGNORECASE)
 _TRUNCATE_PATTERN = re.compile(r"\bTRUNCATE\b", re.IGNORECASE)
 
 
 def _normalize_sql(query: Any) -> str:
-    return " ".join(str(query).strip().split())
+    query_text = str(query)
+    query_text = _BLOCK_COMMENT_PATTERN.sub(" ", query_text)
+    query_text = _LINE_COMMENT_PATTERN.sub(" ", query_text)
+    return " ".join(query_text.strip().split())
 
 
 def validate_database_statement(query: Any) -> None:
@@ -50,6 +55,10 @@ class SafeCursor:
     def execute(self, query: Any, *args: Any, **kwargs: Any):
         validate_database_statement(query)
         return self._cursor.execute(query, *args, **kwargs)
+
+    def executemany(self, query: Any, *args: Any, **kwargs: Any):
+        validate_database_statement(query)
+        return self._cursor.executemany(query, *args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._cursor, name)

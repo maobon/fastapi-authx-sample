@@ -173,7 +173,7 @@ def test_protected_me_update_password_and_delete_routes(client, username):
 
     me_response = client.get("/me", headers=headers)
     protected_response = client.get("/protected", headers=headers)
-    router_protected_response = client.get("/router/protected", headers=headers)
+    router_protected_response = client.get("/api/protected", headers=headers)
     update_response = client.put(
         "/me/password",
         headers=headers,
@@ -225,8 +225,8 @@ def test_router_news_requires_token_and_returns_news(client, monkeypatch):
     monkeypatch.setattr(basic_server.psycopg, "connect", fake_connect)
     token = basic_server.auth.create_access_token(uid="NewsUser")
 
-    missing_token_response = client.get("/router/news")
-    response = client.get("/router/news?page=2&page_size=10", headers={"Authorization": f"Bearer {token}"})
+    missing_token_response = client.get("/api/news")
+    response = client.get("/api/news?page=2&page_size=10", headers={"Authorization": f"Bearer {token}"})
 
     assert missing_token_response.status_code == 401
     assert response.status_code == 200
@@ -252,5 +252,5 @@ def test_protected_routes_reject_missing_token(client):
     assert client.put("/me/password", json={"password": "Newpass1!"}).status_code == 401
     assert client.delete("/me").status_code == 401
     assert client.get("/protected").status_code == 401
-    assert client.get("/router/protected").status_code == 401
-    assert client.get("/router/news").status_code == 401
+    assert client.get("/api/protected").status_code == 401
+    assert client.get("/api/news").status_code == 401

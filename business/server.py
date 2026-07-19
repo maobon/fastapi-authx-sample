@@ -12,12 +12,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from constant import DEFAULT_DATABASE_URL
+from constant import get_database_url
 from business.database_sql import SELECT_NEWS, SELECT_NEWS_PAGED
 from utils.database_utils import database_cursor
 
 
-DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+DATABASE_URL = get_database_url()
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 
@@ -69,7 +69,7 @@ def read_root():
         "message": "Welcome to News Service",
         "database": {
             "url_env": "DATABASE_URL",
-            "default": DEFAULT_DATABASE_URL,
+            "configured": bool(os.environ.get("DATABASE_URL")),
             "table": "news",
         },
         "endpoints": {

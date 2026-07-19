@@ -3,13 +3,15 @@ from pydantic import BaseModel
 
 from authx import AuthX, AuthXConfig
 
+from constant import DEFAULT_JWT_SECRET_KEY
+
 # Create a FastAPI app
 app = FastAPI(title="AuthX Basic Authentication Example")
 
 # Configure AuthX
 auth_config = AuthXConfig(
     JWT_ALGORITHM="HS256",
-    JWT_SECRET_KEY="your-secret-key",  # In production, use a secure key and store it in environment variables
+    JWT_SECRET_KEY=DEFAULT_JWT_SECRET_KEY,  # In production, use a secure key and store it in environment variables
     JWT_TOKEN_LOCATION=["headers"],  # Accept tokens in headers
     JWT_HEADER_TYPE="Bearer",  # Use Bearer authentication
 )

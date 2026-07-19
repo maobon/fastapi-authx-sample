@@ -21,6 +21,12 @@ class FakeCursor:
         if self.error is not None:
             raise self.error
 
+    def executemany(self, query, params):
+        self.query = query
+        self.params = params
+        if self.error is not None:
+            raise self.error
+
 
 class FakeConnection:
     def __init__(self, cursor):
@@ -85,6 +91,9 @@ def test_database_cursor_rolls_back_and_closes_on_error(monkeypatch):
     "query",
     [
         "DROP DATABASE myapp",
+        "DROP/* bypass */DATABASE myapp",
+        "DROP SCHEMA public",
+        "DROP OWNED BY postgres",
         "DROP TABLE user_info",
         "TRUNCATE news",
         "DELETE FROM user_info",
@@ -121,6 +130,25 @@ def test_database_cursor_rolls_back_and_closes_when_unsafe_sql_is_blocked(monkey
     with pytest.raises(ValueError):
         with database_utils.database_cursor("postgresql://test") as db_cursor:
             db_cursor.execute("DROP DATABASE myapp")
+
+    assert cursor.query is None
+    assert connection.committed is False
+    assert connection.rolled_back is True
+    assert connection.closed is True
+
+
+def test_database_cursor_blocks_unsafe_executemany(monkeypatch):
+    cursor = FakeCursor()
+    connection = FakeConnection(cursor)
+
+    def fake_connect(database_url, row_factory=None):
+        return connection
+
+    monkeypatch.setattr(database_utils.psycopg, "connect", fake_connect)
+
+    with pytest.raises(ValueError):
+        with database_utils.database_cursor("postgresql://test") as db_cursor:
+            db_cursor.executemany("DROP TABLE user_info", [])
 
     assert cursor.query is None
     assert connection.committed is False

@@ -9,12 +9,12 @@ from psycopg.rows import dict_row
 from authx import AuthX, AuthXConfig
 
 from business.database_sql import SELECT_NEWS, SELECT_NEWS_PAGED
-from constant import DEFAULT_DATABASE_URL
+from constant import DEFAULT_JWT_SECRET_KEY, get_database_url
 from utils.crypto_utils import CryptoUtils, verify_password
 from utils.database_utils import DatabaseUtils, database_cursor
 from model import LoginRequest, PasswordUpdateRequest, RegisterRequest, TokenResponse, UserResponse
 
-DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+DATABASE_URL = get_database_url()
 PASSWORD_HASH_ITERATIONS = 260_000
 DEFAULT_NEWS_PAGE_SIZE = 20
 MAX_NEWS_PAGE_SIZE = 100
@@ -39,7 +39,7 @@ protected_router = APIRouter(prefix="/api", tags=["router-protected"])
 
 auth_config = AuthXConfig(
     JWT_ALGORITHM="HS256",
-    JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "your-secret-key"),
+    JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", DEFAULT_JWT_SECRET_KEY),
     JWT_TOKEN_LOCATION=["headers"],
     JWT_HEADER_TYPE="Bearer",
     JWT_ACCESS_TOKEN_EXPIRES=60 * 60 * 24,
@@ -183,7 +183,7 @@ def read_root():
         "message": "Welcome to AuthX PostgreSQL Database Example",
         "database": {
             "url_env": "DATABASE_URL",
-            "default": DEFAULT_DATABASE_URL,
+            "configured": bool(os.environ.get("DATABASE_URL")),
             "table": "user_info",
         },
         "endpoints": {
@@ -193,8 +193,8 @@ def read_root():
             "update_password": "PUT /me/password - Update current user's password",
             "delete_me": "DELETE /me - Delete current user",
             "protected": "GET /protected - Access protected resource",
-            "router_protected": "GET /router/protected - Same protection implemented with APIRouter",
-            "router_news": "GET /router/news - List news records after JWT verification",
+            "router_protected": "GET /api/protected - Same protection implemented with APIRouter",
+            "router_news": "GET /api/news - List news records after JWT verification",
         },
     }
 

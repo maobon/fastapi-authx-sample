@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from authx import AuthX, AuthXConfig
 from authx.schema import TokenPayload
 
-from constant import DEFAULT_DATABASE_URL
+from constant import DEFAULT_JWT_SECRET_KEY, get_database_url
 from utils.crypto_utils import CryptoUtils, hash_token, verify_password
 from utils.database_utils import DatabaseUtils
 from model import (
@@ -22,7 +22,7 @@ from model import (
     UserResponse,
 )
 
-DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+DATABASE_URL = get_database_url()
 PASSWORD_HASH_ITERATIONS = 260_000
 database = DatabaseUtils(DATABASE_URL)
 crypto = CryptoUtils(PASSWORD_HASH_ITERATIONS)
@@ -58,7 +58,7 @@ app = FastAPI(title="FastAPI+PostgreSQL AuthX Sample", lifespan=lifespan)
 
 auth_config = AuthXConfig(
     JWT_ALGORITHM="HS256",
-    JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "your-secret-key"),
+    JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", DEFAULT_JWT_SECRET_KEY),
     JWT_TOKEN_LOCATION=["headers", "json"],
     JWT_HEADER_TYPE="Bearer",
     JWT_ACCESS_TOKEN_EXPIRES=60 * 15,
@@ -256,7 +256,7 @@ def read_root():
         "message": "Welcome to AuthX PostgreSQL Advanced Database Example",
         "database": {
             "url_env": "DATABASE_URL",
-            "default": DEFAULT_DATABASE_URL,
+            "configured": bool(os.environ.get("DATABASE_URL")),
             "tables": ["user_info", "user_sessions"],
         },
         "token_storage": {

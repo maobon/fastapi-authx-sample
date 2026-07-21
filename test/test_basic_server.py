@@ -247,10 +247,79 @@ def test_router_news_requires_token_and_returns_news(client, monkeypatch):
     assert cursor.params == (10, 10)
 
 
+def test_router_news_audio_requires_token_and_returns_news_audio(client, monkeypatch):
+    rows = [
+        {
+            "id": 1,
+            "title": "JWT Protected Audio News",
+            "url": "https://example.com/news-audio/1",
+            "published_at": 1784332800,
+            "summary": "A protected audio news summary",
+            "image": "https://example.com/image.jpg",
+            "img": None,
+            "duration": "03:21",
+            "duration_seconds": 201,
+            "m3u8_url": "https://example.com/audio/1.m3u8",
+            "mp3_hash": "abc123",
+            "audio": "https://example.com/audio/1.mp3",
+        }
+    ]
+    cursor = FakeCursor(rows)
+
+    def fake_connect(database_url, row_factory):
+        assert database_url == basic_server.DATABASE_URL
+        assert row_factory is dict_row
+        return FakeConnection(cursor)
+
+    monkeypatch.setattr(basic_server.psycopg, "connect", fake_connect)
+    token = basic_server.auth.create_access_token(uid="NewsAudioUser")
+
+    missing_token_response = client.get("/news-audio")
+    router_missing_token_response = client.get("/api/news-audio")
+    response = client.get("/news-audio?page=3&page_size=5", headers={"Authorization": f"Bearer {token}"})
+    router_response = client.get("/api/news-audio?page=3&page_size=5", headers={"Authorization": f"Bearer {token}"})
+
+    assert missing_token_response.status_code == 401
+    assert router_missing_token_response.status_code == 401
+    assert response.status_code == 200
+    expected_response = {
+        "news_audio": [
+            {
+                "id": 1,
+                "title": "JWT Protected Audio News",
+                "url": "https://example.com/news-audio/1",
+                "published_at": 1784332800,
+                "summary": "A protected audio news summary",
+                "image": "https://example.com/image.jpg",
+                "img": None,
+                "duration": "03:21",
+                "duration_seconds": 201,
+                "m3u8_url": "https://example.com/audio/1.m3u8",
+                "mp3_hash": "abc123",
+                "audio": "https://example.com/audio/1.mp3",
+            }
+        ],
+    }
+    assert response.json() == expected_response
+    assert router_response.status_code == 200
+    assert router_response.json() == expected_response
+    assert "raw_data" not in response.json()["news_audio"][0]
+    assert "created_at" not in response.json()["news_audio"][0]
+    assert "updated_at" not in response.json()["news_audio"][0]
+    assert "FROM news_audio" in cursor.query
+    assert "raw_data" not in cursor.query
+    assert "created_at" not in cursor.query
+    assert "updated_at" not in cursor.query
+    assert "LIMIT %s OFFSET %s" in cursor.query
+    assert cursor.params == (5, 10)
+
+
 def test_protected_routes_reject_missing_token(client):
     assert client.get("/me").status_code == 401
     assert client.put("/me/password", json={"password": "Newpass1!"}).status_code == 401
     assert client.delete("/me").status_code == 401
     assert client.get("/protected").status_code == 401
+    assert client.get("/news-audio").status_code == 401
     assert client.get("/api/protected").status_code == 401
     assert client.get("/api/news").status_code == 401
+    assert client.get("/api/news-audio").status_code == 401

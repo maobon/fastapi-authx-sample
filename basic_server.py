@@ -8,7 +8,12 @@ from psycopg.rows import dict_row
 
 from authx import AuthX, AuthXConfig
 
-from business.database_sql import SELECT_NEWS, SELECT_NEWS_PAGED
+from business.database_sql import (
+    SELECT_NEWS,
+    SELECT_NEWS_AUDIO,
+    SELECT_NEWS_AUDIO_PAGED,
+    SELECT_NEWS_PAGED,
+)
 from constant import DEFAULT_JWT_SECRET_KEY, get_database_url
 from utils.crypto_utils import CryptoUtils, verify_password
 from utils.database_utils import DatabaseUtils, database_cursor
@@ -82,6 +87,19 @@ def list_news(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PAGE_SIZ
         else:
             cursor.execute(
                 SELECT_NEWS_PAGED,
+                (page_size, (page - 1) * page_size),
+            )
+        return cursor.fetchall()
+
+
+def list_news_audio(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PAGE_SIZE) -> list[dict]:
+    """读取 PostgreSQL 数据库中 `news_audio` 表的音频新闻数据。"""
+    with database_cursor(DATABASE_URL, row_factory=dict_row) as cursor:
+        if page is None:
+            cursor.execute(SELECT_NEWS_AUDIO)
+        else:
+            cursor.execute(
+                SELECT_NEWS_AUDIO_PAGED,
                 (page_size, (page - 1) * page_size),
             )
         return cursor.fetchall()
@@ -173,6 +191,26 @@ async def protected_news(
     return {"news": news}
 
 
+@app.get("/news-audio")
+@protected_router.get("/news-audio")
+async def protected_news_audio(
+    request: Request,
+    page: Optional[int] = Query(default=None, ge=1),
+    page_size: int = Query(default=DEFAULT_NEWS_PAGE_SIZE, ge=1, le=MAX_NEWS_PAGE_SIZE),
+):
+    """受保护音频新闻接口：JWT 校验通过后返回 `news_audio` 表中的音频新闻数据。"""
+    await verify_access_token(request)
+    try:
+        news_audio = list_news_audio(page=page, page_size=page_size)
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to query news audio",
+        ) from exc
+
+    return {"news_audio": news_audio}
+
+
 app.include_router(protected_router)
 
 
@@ -193,8 +231,10 @@ def read_root():
             "update_password": "PUT /me/password - Update current user's password",
             "delete_me": "DELETE /me - Delete current user",
             "protected": "GET /protected - Access protected resource",
+            "news_audio": "GET /news-audio - List news_audio records after JWT verification",
             "router_protected": "GET /api/protected - Same protection implemented with APIRouter",
             "router_news": "GET /api/news - List news records after JWT verification",
+            "router_news_audio": "GET /api/news-audio - List news_audio records after JWT verification",
         },
     }
 

@@ -4,6 +4,7 @@ from typing import Optional
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from authx import AuthX, AuthXConfig
 from authx.schema import TokenPayload
@@ -55,6 +56,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="FastAPI+PostgreSQL AuthX Sample", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 auth_config = AuthXConfig(
     JWT_ALGORITHM="HS256",

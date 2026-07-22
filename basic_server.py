@@ -4,6 +4,7 @@ from typing import Optional
 
 import psycopg
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 
 from authx import AuthX, AuthXConfig
@@ -40,6 +41,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="FastAPI+PostgreSQL AuthX Sample", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 protected_router = APIRouter(prefix="/api", tags=["router-protected"])
 
 auth_config = AuthXConfig(

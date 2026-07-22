@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from authx import AuthX, AuthXConfig
@@ -7,6 +8,13 @@ from constant import DEFAULT_JWT_SECRET_KEY
 
 # Create a FastAPI app
 app = FastAPI(title="AuthX Basic Authentication Example")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Configure AuthX
 auth_config = AuthXConfig(

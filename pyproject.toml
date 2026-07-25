@@ -8,6 +8,7 @@ dependencies = [
     "psycopg>=3.2.13",
     "pydantic>=2.13.4",
     "uvicorn>=0.39.0",
+    "websockets>=15.0.1",
 ]
 
 [dependency-groups]

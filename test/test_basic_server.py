@@ -59,10 +59,11 @@ class FakeConnection:
 
 @pytest.fixture
 def username():
+    from business.auth_business import delete_user
     value = unique_username("BasicTest")
-    basic_server.delete_user(value)
+    delete_user(value)
     yield value
-    basic_server.delete_user(value)
+    delete_user(value)
 
 
 @pytest.fixture
@@ -80,33 +81,35 @@ def test_init_database_and_lifespan_create_table(client):
 
 
 def test_create_get_update_delete_user_helpers(username):
-    created_user = basic_server.create_user(username, "Passw0rd!")
+    from business.auth_business import create_user, get_user_by_username, update_user_password, delete_user, verify_password
+    created_user = create_user(username, "Passw0rd!")
 
     assert created_user["username"] == username
     assert "password_hash" not in created_user
 
-    public_user = basic_server.get_user_by_username(username)
-    private_user = basic_server.get_user_by_username(username, include_password_hash=True)
+    public_user = get_user_by_username(username)
+    private_user = get_user_by_username(username, include_password_hash=True)
 
     assert public_user["username"] == username
     assert "password_hash" not in public_user
     assert private_user["password_hash"].startswith("pbkdf2_sha256$")
 
-    updated_user = basic_server.update_user_password(username, "Newpass1!")
-    updated_private_user = basic_server.get_user_by_username(username, include_password_hash=True)
+    updated_user = update_user_password(username, "Newpass1!")
+    updated_private_user = get_user_by_username(username, include_password_hash=True)
 
     assert updated_user["username"] == username
-    assert basic_server.verify_password("Newpass1!", updated_private_user["password_hash"])
-    assert basic_server.delete_user(username) is True
-    assert basic_server.delete_user(username) is False
-    assert basic_server.get_user_by_username(username) is None
+    assert verify_password("Newpass1!", updated_private_user["password_hash"])
+    assert delete_user(username) is True
+    assert delete_user(username) is False
+    assert get_user_by_username(username) is None
 
 
 def test_create_user_duplicate_raises_conflict(username):
-    basic_server.create_user(username, "Passw0rd!")
+    from business.auth_business import create_user
+    create_user(username, "Passw0rd!")
 
     with pytest.raises(HTTPException) as exc_info:
-        basic_server.create_user(username, "Passw0rd!")
+        create_user(username, "Passw0rd!")
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "Username already exists"
@@ -172,8 +175,6 @@ def test_protected_me_update_password_and_delete_routes(client, username):
     headers = {"Authorization": f"Bearer {token}"}
 
     me_response = client.get("/me", headers=headers)
-    protected_response = client.get("/protected", headers=headers)
-    router_protected_response = client.get("/api/protected", headers=headers)
     update_response = client.put(
         "/me/password",
         headers=headers,
@@ -192,10 +193,6 @@ def test_protected_me_update_password_and_delete_routes(client, username):
 
     assert me_response.status_code == 200
     assert me_response.json()["username"] == username
-    assert protected_response.status_code == 200
-    assert protected_response.json()["username"] == username
-    assert router_protected_response.status_code == 200
-    assert router_protected_response.json()["username"] == username
     assert update_response.status_code == 200
     assert old_password_response.status_code == 401
     assert new_password_response.status_code == 200
@@ -218,11 +215,12 @@ def test_router_news_requires_token_and_returns_news(client, monkeypatch):
     cursor = FakeCursor(rows)
 
     def fake_connect(database_url, row_factory):
-        assert database_url == basic_server.DATABASE_URL
+        from business.deps import DATABASE_URL
+        assert database_url == DATABASE_URL
         assert row_factory is dict_row
         return FakeConnection(cursor)
 
-    monkeypatch.setattr(basic_server.psycopg, "connect", fake_connect)
+    monkeypatch.setattr("utils.database_utils.psycopg.connect", fake_connect)
     token = basic_server.auth.create_access_token(uid="NewsUser")
 
     missing_token_response = client.get("/api/news")
@@ -267,16 +265,17 @@ def test_router_news_audio_requires_token_and_returns_news_audio(client, monkeyp
     cursor = FakeCursor(rows)
 
     def fake_connect(database_url, row_factory):
-        assert database_url == basic_server.DATABASE_URL
+        from business.deps import DATABASE_URL
+        assert database_url == DATABASE_URL
         assert row_factory is dict_row
         return FakeConnection(cursor)
 
-    monkeypatch.setattr(basic_server.psycopg, "connect", fake_connect)
+    monkeypatch.setattr("utils.database_utils.psycopg.connect", fake_connect)
     token = basic_server.auth.create_access_token(uid="NewsAudioUser")
 
-    missing_token_response = client.get("/news-audio")
+    missing_token_response = client.get("/api/news-audio")
     router_missing_token_response = client.get("/api/news-audio")
-    response = client.get("/news-audio?page=3&page_size=5", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/api/news-audio?page=3&page_size=5", headers={"Authorization": f"Bearer {token}"})
     router_response = client.get("/api/news-audio?page=3&page_size=5", headers={"Authorization": f"Bearer {token}"})
 
     assert missing_token_response.status_code == 401
@@ -318,8 +317,5 @@ def test_protected_routes_reject_missing_token(client):
     assert client.get("/me").status_code == 401
     assert client.put("/me/password", json={"password": "Newpass1!"}).status_code == 401
     assert client.delete("/me").status_code == 401
-    assert client.get("/protected").status_code == 401
-    assert client.get("/news-audio").status_code == 401
-    assert client.get("/api/protected").status_code == 401
-    assert client.get("/api/news").status_code == 401
     assert client.get("/api/news-audio").status_code == 401
+    assert client.get("/api/news").status_code == 401

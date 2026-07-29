@@ -8,5 +8,5 @@
   "minio_secret_key": "minioadmin",
   "minio_bucket": "images",
   "minio_secure": false,
-  "minio_public_host": "117.72.96.233"
+  "minio_public_host": "117.72.96.233:9000"
 }

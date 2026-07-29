@@ -13,11 +13,10 @@ dependencies = [
     "minio>=7.2.14",
     "python-multipart>=0.0.9",
     "urllib3>=2.6.3",
+    "httpx[socks]>=0.28.1",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
-    "httpx2>=2.0.0",
     "pytest>=8.4.2",
 ]

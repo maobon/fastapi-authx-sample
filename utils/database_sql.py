@@ -49,6 +49,13 @@ WHERE username = %s
 RETURNING id, username, extra, created_at, updated_at
 """
 
+UPDATE_USER_EXTRA = """
+UPDATE user_info
+SET extra = extra || %s::jsonb, updated_at = NOW()
+WHERE username = %s
+RETURNING id, username, extra, created_at, updated_at
+"""
+
 DELETE_USER_BY_USERNAME = """
 DELETE FROM user_info
 WHERE username = %s

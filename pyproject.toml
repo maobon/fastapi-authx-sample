@@ -5,8 +5,9 @@ requires-python = ">=3.9"
 dependencies = [
     "authx>=1.7.1",
     "fastapi>=0.128.8",
-    "psycopg>=3.2.13",
+    "psycopg[pool]>=3.2.13",
     "pydantic>=2.13.4",
+    "pydantic-settings>=2.4.0",
     "uvicorn>=0.39.0",
     "websockets>=15.0.1",
     "minio>=7.2.14",

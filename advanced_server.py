@@ -1,5 +1,4 @@
 import contextlib
-import os
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +25,7 @@ from business.chat_router import router as chat_router
 from business.advanced_auth_router import router as advanced_auth_router
 from utils.minio_manager import ensure_bucket_exists
 from utils.logging_utils import setup_logging
+from config import settings
 from model import (
     LoginRequest,
     PasswordUpdateRequest,
@@ -34,23 +34,39 @@ from model import (
     UserResponse,
 )
 
+
 def init_database() -> None:
     """初始化用户表和登录会话表。"""
     database.init_advanced_database()
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """FastAPI 启动时初始化数据库，保证接口处理请求前表结构可用。"""
     setup_logging()
+    database.open_pool()
     init_database()
     ensure_bucket_exists(MINIO_BUCKET)
     await init_http_client()
     yield
     await close_http_client()
+    database.close_pool()
 
 
 app = FastAPI(title="FastAPI+PostgreSQL AuthX Advanced App", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """全局 HTTP 请求日志中间件。"""
+    head_pic = request.headers.get("head_pic")
+    auth_header = "Present" if request.headers.get("authorization") else "Missing"
+    msg = f">>> [HTTP] {request.method} {request.url.path} | Auth: {auth_header} | head_pic: {head_pic}"
+    print(msg)
+    response = await call_next(request)
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -73,7 +89,10 @@ def login(user: LoginRequest):
     """用户登录接口：校验密码后签发 access token，并保存 refresh token session。"""
     db_user = get_user_by_username(user.username, include_password_hash=True)
     if db_user is None or not verify_password(user.password, db_user["password_hash"]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
 
     return issue_token_pair(db_user)
 
@@ -123,7 +142,7 @@ def read_root():
         "message": "Welcome to AuthX PostgreSQL Advanced App",
         "database": {
             "url_env": "DATABASE_URL",
-            "configured": bool(os.environ.get("DATABASE_URL")),
+            "configured": True,
             "tables": ["user_info", "user_sessions"],
         },
         "endpoints": {
@@ -141,6 +160,4 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=settings.port)

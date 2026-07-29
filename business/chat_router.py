@@ -1,12 +1,13 @@
-from fastapi import APIRouter, File, UploadFile, WebSocket, status
+from fastapi import APIRouter, File, UploadFile, WebSocket, status, Request
 from authx.exceptions import AuthXException
 
 from utils.chat_utils import get_http_client
 from utils.minio_manager import minio_client, MINIO_BUCKET, MINIO_ENDPOINT
 from business.chat_business import handle_chat_session, handle_image_upload
-from business.deps import auth, manager
+from business.deps import auth, manager, verify_access_token
 
 router = APIRouter(tags=["chat"])
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -22,7 +23,24 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await handle_chat_session(websocket, user_id, manager, get_http_client())
 
+
 @router.post("/upload/pic")
-async def upload_pic(file: UploadFile = File(...)):
-    """接收图片文件并流式保存到 MinIO。"""
-    return await handle_image_upload(file, minio_client, MINIO_BUCKET, MINIO_ENDPOINT)
+async def upload_pic(request: Request, file: UploadFile = File(...)):
+    """接收图片文件并流式保存到 MinIO """
+    username = await verify_access_token(request)
+
+    # 检查请求头中的 head_pic 字段
+    head_pic_header = request.headers.get("head_pic", "false").lower()
+    is_head_pic = head_pic_header == "true"
+
+    msg = f"--- [API Upload] User: {username}, Is Avatar: {is_head_pic} (Hdr: {head_pic_header})"
+    print(msg)
+
+    return await handle_image_upload(
+        file,
+        minio_client,
+        MINIO_BUCKET,
+        MINIO_ENDPOINT,
+        username=username,
+        is_head_pic=is_head_pic
+    )

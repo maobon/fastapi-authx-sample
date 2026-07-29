@@ -9,14 +9,19 @@ from business.database_sql import (
     SELECT_NEWS_AUDIO_PAGED,
     SELECT_NEWS_PAGED,
 )
-from utils.database_utils import database_cursor
-from business.deps import DATABASE_URL, DEFAULT_NEWS_PAGE_SIZE, MAX_NEWS_PAGE_SIZE, verify_access_token
+from business.deps import (
+    database,
+    DEFAULT_NEWS_PAGE_SIZE,
+    MAX_NEWS_PAGE_SIZE,
+    verify_access_token
+)
 
 router = APIRouter(prefix="/api", tags=["news"])
 
+
 def list_news(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PAGE_SIZE) -> list[dict]:
     """读取 PostgreSQL 数据库中 `news` 表的新闻数据。"""
-    with database_cursor(DATABASE_URL, row_factory=dict_row) as cursor:
+    with database.get_cursor(row_factory=dict_row) as cursor:
         if page is None:
             cursor.execute(SELECT_NEWS)
         else:
@@ -26,9 +31,13 @@ def list_news(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PAGE_SIZ
             )
         return cursor.fetchall()
 
-def list_news_audio(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PAGE_SIZE) -> list[dict]:
+
+def list_news_audio(
+    page: Optional[int] = None,
+    page_size: int = DEFAULT_NEWS_PAGE_SIZE
+) -> list[dict]:
     """读取 PostgreSQL 数据库中 `news_audio` 表的音频新闻数据。"""
-    with database_cursor(DATABASE_URL, row_factory=dict_row) as cursor:
+    with database.get_cursor(row_factory=dict_row) as cursor:
         if page is None:
             cursor.execute(SELECT_NEWS_AUDIO)
         else:
@@ -37,6 +46,7 @@ def list_news_audio(page: Optional[int] = None, page_size: int = DEFAULT_NEWS_PA
                 (page_size, (page - 1) * page_size),
             )
         return cursor.fetchall()
+
 
 @router.get("/news")
 async def get_news(
@@ -55,6 +65,7 @@ async def get_news(
         ) from exc
 
     return {"news": news}
+
 
 @router.get("/news-audio")
 async def get_news_audio(

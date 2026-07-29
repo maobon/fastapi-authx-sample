@@ -228,4 +228,5 @@ __marimo__/
 /.idea/pyProjectModel.xml
 /.idea/caches/deviceStreaming.xml
 
-artifacts/
+.artifacts/
+/.idea/planningMode.xml

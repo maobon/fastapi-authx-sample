@@ -4,6 +4,7 @@ from typing import Any, Iterator, Optional
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from utils.database_sql import (
     CREATE_USER_INFO_TABLE,
@@ -17,6 +18,7 @@ from utils.database_sql import (
     SELECT_USER_BY_USERNAME,
     SELECT_USER_SESSIONS_BY_USERNAME,
     SELECT_USER_WITH_PASSWORD_HASH_BY_USERNAME,
+    UPDATE_USER_EXTRA,
     UPDATE_USER_PASSWORD,
 )
 
@@ -76,7 +78,10 @@ def _connection_is_open(connection: Any) -> bool:
 
 @contextmanager
 def database_cursor(database_url: str, row_factory: Optional[Any] = None) -> Iterator[Any]:
-    """Open a PostgreSQL cursor and always close or reset the transaction state."""
+    """
+    Open a PostgreSQL cursor and always close or reset the transaction state.
+    DEPRECATED: Use DatabaseUtils.get_cursor() instead.
+    """
     connection = None
     try:
         connection = _connect(database_url, row_factory=row_factory)
@@ -98,35 +103,68 @@ class DatabaseUtils:
 
     def __init__(self, database_url: str):
         self.database_url = database_url
+        self._pool: Optional[ConnectionPool] = None
+
+    def open_pool(self) -> None:
+        """初始化并打开数据库连接池。"""
+        if self._pool is None:
+            self._pool = ConnectionPool(self.database_url, min_size=1, max_size=10)
+            self._pool.wait()
+
+    def close_pool(self) -> None:
+        """关闭数据库连接池。"""
+        if self._pool is not None:
+            self._pool.close()
+            self._pool = None
+
+    @contextmanager
+    def get_cursor(self, row_factory: Optional[Any] = None) -> Iterator[Any]:
+        """从连接池中获取连接并返回 SafeCursor。"""
+        from config import settings
+        if self._pool is None or settings.disable_db_pool:
+            # Fallback for code not yet updated to open the pool or in test environments
+            with database_cursor(self.database_url, row_factory=row_factory) as cursor:
+                yield cursor
+            return
+
+        with self._pool.connection() as conn:
+            if row_factory is not None:
+                conn.row_factory = row_factory
+            with conn.cursor() as cursor:
+                yield SafeCursor(cursor)
 
     def init_database(self) -> None:
         """确保基础用户表存在。"""
-        with database_cursor(self.database_url) as cursor:
+        with self.get_cursor() as cursor:
             cursor.execute(CREATE_USER_INFO_TABLE)
 
     def init_advanced_database(self) -> None:
         """确保用户表和登录会话表都存在。"""
-        with database_cursor(self.database_url) as cursor:
+        with self.get_cursor() as cursor:
             cursor.execute(CREATE_USER_INFO_TABLE)
             cursor.execute(CREATE_USER_SESSIONS_TABLE)
 
     def create_user(self, username: str, password_hash: str) -> dict:
         """新增用户，返回公开用户信息。"""
-        with database_cursor(self.database_url, row_factory=dict_row) as cursor:
+        with self.get_cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 INSERT_USER,
                 (username, password_hash),
             )
             return cursor.fetchone()
 
-    def get_user_by_username(self, username: str, include_password_hash: bool = False) -> Optional[dict]:
+    def get_user_by_username(
+        self,
+        username: str,
+        include_password_hash: bool = False
+    ) -> Optional[dict]:
         """按用户名查询用户；登录场景可选择返回密码哈希。"""
         if include_password_hash:
             query = SELECT_USER_WITH_PASSWORD_HASH_BY_USERNAME
         else:
             query = SELECT_USER_BY_USERNAME
 
-        with database_cursor(self.database_url, row_factory=dict_row) as cursor:
+        with self.get_cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 query,
                 (username,),
@@ -135,16 +173,25 @@ class DatabaseUtils:
 
     def update_user_password(self, username: str, password_hash: str) -> Optional[dict]:
         """更新用户密码哈希。"""
-        with database_cursor(self.database_url, row_factory=dict_row) as cursor:
+        with self.get_cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 UPDATE_USER_PASSWORD,
                 (password_hash, username),
             )
             return cursor.fetchone()
 
+    def update_user_extra(self, username: str, extra_data: dict) -> Optional[dict]:
+        """更新用户的 extra JSONB 字段（合并模式）。"""
+        with self.get_cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                UPDATE_USER_EXTRA,
+                (psycopg.types.json.Jsonb(extra_data), username),
+            )
+            return cursor.fetchone()
+
     def delete_user(self, username: str) -> bool:
         """按用户名删除用户，返回是否删除成功。"""
-        with database_cursor(self.database_url) as cursor:
+        with self.get_cursor() as cursor:
             cursor.execute(DELETE_USER_BY_USERNAME, (username,))
             return cursor.rowcount > 0
 
@@ -156,7 +203,7 @@ class DatabaseUtils:
         expires_at,
     ) -> dict:
         """新增 refresh token 登录会话。"""
-        with database_cursor(self.database_url, row_factory=dict_row) as cursor:
+        with self.get_cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 INSERT_USER_SESSION,
                 (user_id, refresh_token_hash, refresh_jti, expires_at),
@@ -165,7 +212,7 @@ class DatabaseUtils:
 
     def get_active_session(self, refresh_token_hash: str) -> Optional[dict]:
         """按 refresh token 哈希查询未吊销、未过期的 session。"""
-        with database_cursor(self.database_url, row_factory=dict_row) as cursor:
+        with self.get_cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 SELECT_ACTIVE_SESSION_BY_REFRESH_TOKEN_HASH,
                 (refresh_token_hash,),
@@ -174,7 +221,7 @@ class DatabaseUtils:
 
     def revoke_session(self, refresh_token_hash: str) -> bool:
         """按 refresh token 哈希吊销单个 session。"""
-        with database_cursor(self.database_url) as cursor:
+        with self.get_cursor() as cursor:
             cursor.execute(
                 REVOKE_SESSION_BY_REFRESH_TOKEN_HASH,
                 (refresh_token_hash,),
@@ -183,7 +230,7 @@ class DatabaseUtils:
 
     def revoke_all_user_sessions(self, username: str) -> int:
         """吊销指定用户的所有 session。"""
-        with database_cursor(self.database_url) as cursor:
+        with self.get_cursor() as cursor:
             cursor.execute(
                 REVOKE_ALL_USER_SESSIONS_BY_USERNAME,
                 (username,),
@@ -192,7 +239,7 @@ class DatabaseUtils:
 
     def list_user_sessions(self, username: str) -> list[dict]:
         """列出指定用户的所有 session。"""
-        with database_cursor(self.database_url, row_factory=dict_row) as cursor:
+        with self.get_cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 SELECT_USER_SESSIONS_BY_USERNAME,
                 (username,),

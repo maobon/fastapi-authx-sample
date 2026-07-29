@@ -7,9 +7,11 @@ from fastapi import WebSocket, WebSocketDisconnect
 # 全局 HTTP 客户端
 _http_client: Optional[httpx.AsyncClient] = None
 
+
 def get_http_client() -> Optional[httpx.AsyncClient]:
     """获取全局 HTTP 客户端。"""
     return _http_client
+
 
 async def init_http_client():
     """初始化全局 HTTP 客户端。"""
@@ -17,12 +19,14 @@ async def init_http_client():
     if _http_client is None:
         _http_client = httpx.AsyncClient()
 
+
 async def close_http_client():
     """关闭全局 HTTP 客户端。"""
     global _http_client
     if _http_client is not None:
         await _http_client.aclose()
         _http_client = None
+
 
 class ConnectionManager:
     """管理在线客户端，记录用户身份，并把消息转发给其他客户端。"""
@@ -65,6 +69,7 @@ class ConnectionManager:
 
         for connection in disconnected_connections:
             self.disconnect(connection)
+
 
 async def process_image_url(http_client: Optional[httpx.AsyncClient], url: str) -> Dict[str, Any]:
     """获取图片 URL 的基本信息以验证其有效性。"""

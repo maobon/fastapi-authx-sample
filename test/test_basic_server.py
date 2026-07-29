@@ -215,7 +215,7 @@ def test_router_news_requires_token_and_returns_news(client, monkeypatch):
     cursor = FakeCursor(rows)
 
     def fake_connect(database_url, row_factory):
-        from config import settings
+        from config_loader import settings
         assert database_url == settings.database_url
         assert row_factory is dict_row
         return FakeConnection(cursor)
@@ -265,7 +265,7 @@ def test_router_news_audio_requires_token_and_returns_news_audio(client, monkeyp
     cursor = FakeCursor(rows)
 
     def fake_connect(database_url, row_factory):
-        from config import settings
+        from config_loader import settings
         assert database_url == settings.database_url
         assert row_factory is dict_row
         return FakeConnection(cursor)

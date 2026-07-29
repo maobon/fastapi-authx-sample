@@ -120,7 +120,7 @@ class DatabaseUtils:
     @contextmanager
     def get_cursor(self, row_factory: Optional[Any] = None) -> Iterator[Any]:
         """从连接池中获取连接并返回 SafeCursor。"""
-        from config import settings
+        from config_loader import settings
         if self._pool is None or settings.disable_db_pool:
             # Fallback for code not yet updated to open the pool or in test environments
             with database_cursor(self.database_url, row_factory=row_factory) as cursor:

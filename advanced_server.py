@@ -25,7 +25,7 @@ from business.chat_router import router as chat_router
 from business.advanced_auth_router import router as advanced_auth_router
 from utils.minio_manager import ensure_bucket_exists
 from utils.logging_utils import setup_logging
-from config import settings
+from config_loader import settings
 from model import (
     LoginRequest,
     PasswordUpdateRequest,

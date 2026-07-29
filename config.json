@@ -1,0 +1,12 @@
+{
+  "port": 8000,
+  "jwt_secret_key": "dev-only-change-me-32-byte-secret-key",
+  "database_url": "postgresql://postgres:@127.0.0.1:5432/myapp",
+  "disable_db_pool": false,
+  "minio_endpoint": "127.0.0.1:9000",
+  "minio_access_key": "minioadmin",
+  "minio_secret_key": "minioadmin",
+  "minio_bucket": "images",
+  "minio_secure": false,
+  "minio_public_host": "117.72.96.233"
+}

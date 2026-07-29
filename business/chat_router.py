@@ -2,7 +2,7 @@ from fastapi import APIRouter, File, UploadFile, WebSocket, status, Request
 from authx.exceptions import AuthXException
 
 from utils.chat_utils import get_http_client
-from utils.minio_manager import minio_client, MINIO_BUCKET, MINIO_ENDPOINT
+from utils.minio_manager import minio_client, MINIO_BUCKET, MINIO_PUBLIC_HOST, MINIO_SECURE
 from business.chat_business import handle_chat_session, handle_image_upload
 from business.deps import auth, manager, verify_access_token
 
@@ -40,7 +40,8 @@ async def upload_pic(request: Request, file: UploadFile = File(...)):
         file,
         minio_client,
         MINIO_BUCKET,
-        MINIO_ENDPOINT,
+        MINIO_PUBLIC_HOST,
+        use_ssl=MINIO_SECURE,
         username=username,
         is_head_pic=is_head_pic
     )

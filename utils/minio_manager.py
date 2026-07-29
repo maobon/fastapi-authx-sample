@@ -1,6 +1,6 @@
 import logging
 from minio import Minio
-from config import settings
+from config_loader import settings
 
 # MinIO 配置从 settings 中读取
 MINIO_ENDPOINT = settings.get_minio_endpoint_clean()
@@ -8,6 +8,7 @@ MINIO_ACCESS_KEY = settings.minio_access_key
 MINIO_SECRET_KEY = settings.minio_secret_key
 MINIO_BUCKET = settings.minio_bucket
 MINIO_SECURE = settings.minio_secure
+MINIO_PUBLIC_HOST = settings.minio_public_host
 
 minio_client = Minio(
     MINIO_ENDPOINT,

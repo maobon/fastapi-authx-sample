@@ -120,7 +120,8 @@ async def handle_image_upload(
     file: UploadFile,
     minio_client: Minio,
     bucket_name: str,
-    minio_endpoint: str,
+    minio_public_host: str,
+    use_ssl: bool = False,
     username: Optional[str] = None,
     is_head_pic: bool = False
 ) -> Dict[str, Any]:
@@ -163,7 +164,8 @@ async def handle_image_upload(
 
         # 5. 构造访问链接
         encoded_name = "/".join(quote(part, safe="") for part in object_name.split("/"))
-        image_url = f"http://{minio_endpoint}/{bucket_name}/{encoded_name}"
+        protocol = "https" if use_ssl else "http"
+        image_url = f"{protocol}://{minio_public_host}/{bucket_name}/{encoded_name}"
 
         # 6. 如果是头像，更新用户数据库信息
         if is_head_pic and username:

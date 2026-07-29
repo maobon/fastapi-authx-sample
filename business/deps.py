@@ -1,7 +1,7 @@
 from datetime import timedelta
 from fastapi import Request
 from authx import AuthX, AuthXConfig
-from config import settings
+from config_loader import settings
 from utils.database_utils import DatabaseUtils
 from utils.crypto_utils import CryptoUtils
 from utils.chat_utils import ConnectionManager, init_http_client, close_http_client

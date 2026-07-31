@@ -71,6 +71,9 @@ async def handle_chat_session(
                 data = {"type": "text", "content": message}
 
             msg_type = data.get("type")
+            if isinstance(msg_type, str):
+                msg_type = msg_type.strip().lower()
+
             if msg_type == "text":
                 await manager.broadcast(data, sender=websocket)
             elif msg_type == "image":
@@ -99,6 +102,7 @@ async def handle_chat_session(
                 # 调试期间直接广播给其他客户端，manager.broadcast 会自动注入 sender 和 timestamp
                 await manager.broadcast(data, sender=websocket)
             else:
+                print(f"DEBUG: Unsupported message type: {msg_type} (Raw: {data})")
                 await websocket.send_json(
                     {"type": "error", "message": f"Unsupported type: {msg_type}"})
 

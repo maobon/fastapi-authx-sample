@@ -93,6 +93,11 @@ async def handle_chat_session(
                         "type": "error",
                         "message": f"Invalid image URL: {info['error']}"
                     })
+            elif msg_type == "rtc":
+                # WebRTC 交换支持 (SDP/Candidate)
+                # 报文格式示例: {"type":"rtc", "offer":"...", "answer":"...", "candidate":"..."}
+                # 调试期间直接广播给其他客户端，manager.broadcast 会自动注入 sender 和 timestamp
+                await manager.broadcast(data, sender=websocket)
             else:
                 await websocket.send_json(
                     {"type": "error", "message": f"Unsupported type: {msg_type}"})

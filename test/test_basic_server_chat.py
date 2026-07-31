@@ -48,7 +48,7 @@ def test_websocket_chat_exchange_messages(client, token):
         assert resp["content"] == "Hello from A"
         assert resp["sender"] == "UserA"
 
-def test_upload_image_to_minio(client, monkeypatch):
+def test_upload_image_to_minio(client, token, monkeypatch):
     """Test image upload logic."""
     # Mock minio_client in the business router where it is used
     mock_minio = MagicMock()
@@ -57,6 +57,7 @@ def test_upload_image_to_minio(client, monkeypatch):
     file_content = b"fake image content"
     response = client.post(
         "/upload/pic",
+        headers={"Authorization": f"Bearer {token}"},
         files={"file": ("test.png", file_content, "image/png")}
     )
 
